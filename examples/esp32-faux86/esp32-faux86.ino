@@ -19,37 +19,64 @@
  * PSRAM:            "OPI PSRAM"
  ******************************************************************************/
 
-#include "TDECK_PINS.h"
+#include <Arduino_GFX_Library.h>
+
+// mimic metro s3: TODO remove later
+#ifndef ARDUINO_METRO_ESP32S3
+  #define ARDUINO_METRO_ESP32S3
+#endif
+
+#if defined(ARDUINO_ESP32_S3_BOX)
+
+#define TFT_DC 4
+#define TFT_CS 5
+#define TFT_SCK 7
+#define TFT_MOSI 6
+#define TFT_RST 48
+#define TFT_BL 45
+
+#define TFT_Controller Arduino_ILI9342
+#define TFT_SPEED_HZ (40*1000*1000ul)
+#define TFT_ROTATION 4
+
+#elif defined(ARDUINO_METRO_ESP32S3)
+
+#define TFT_DC 9
+#define TFT_CS 10
+// Feather
+//#define TFT_DC 10
+//#define TFT_CS 9
+#define TFT_SCK 39
+#define TFT_MOSI 42
+#define TFT_RST GFX_NOT_DEFINED
+//#define TFT_BL 45
+
+#define TFT_Controller Arduino_ILI9341
+#define TFT_SPEED_HZ (60*1000*1000ul)
+#define TFT_ROTATION 1
+
+#else
+
+// #include "TDECK_PINS.h"
+
+#define TFT_DC 11
+#define TFT_CS 12
+#define TFT_SCK 40
+#define TFT_MOSI 41
+#define TFT_RST GFX_NOT_DEFINED
+#define TFT_BL 42
+
+#define TFT_Controller Arduino_ST7789
+#define TFT_SPEED_HZ (80*1000*1000ul)
+#define TFT_ROTATION 1
+
+#endif
+
+Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI);
+Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST, TFT_ROTATION, false /* IPS */);
 
 #define TRACK_SPEED 2
 #define KEY_SCAN_MS_INTERVAL 200
-
-/*******************************************************************************
- * Start of Arduino_GFX setting
- ******************************************************************************/
-#include <Arduino_GFX_Library.h>
-// #define GFX_BL DF_GFX_BL // default backlight pin, you may replace DF_GFX_BL to actual backlight pin
-// Arduino_DataBus *bus = create_default_Arduino_DataBus();
-// Arduino_TFT *gfx = new Arduino_ILI9341(bus, DF_GFX_RST, 3 /* rotation */, false /* IPS */);
-#define GFX_DEV_DEVICE LILYGO_T_DECK
-#define GFX_EXTRA_PRE_INIT()                         \
-  {                                                  \
-    pinMode(39 /* TDECK_SDCARD_CS */, OUTPUT);       \
-    digitalWrite(39 /* TDECK_SDCARD_CS */, HIGH);    \
-    pinMode(9 /* TDECK_RADIO_CS */, OUTPUT);         \
-    digitalWrite(9 /* TDECK_RADIO_CS */, HIGH);      \
-    pinMode(10 /* TDECK_PERI_POWERON */, OUTPUT);    \
-    digitalWrite(10 /* TDECK_PERI_POWERON */, HIGH); \
-    delay(500);                                      \
-  }
-#define GFX_BL 42
-Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(11 /* DC */, 12 /* CS */, 40 /* SCK */, 41 /* MOSI */,
-                                               GFX_NOT_DEFINED /* MISO */);
-Arduino_TFT* gfx = new Arduino_ST7789(bus, GFX_NOT_DEFINED /* RST */, 1 /* rotation */, false /* IPS */);
-
-/*******************************************************************************
- * End of Arduino_GFX setting
- ******************************************************************************/
 
 /*******************************************************************************
  * Please config the touch panel in touch.h
@@ -122,21 +149,18 @@ void setup() {
   // while(!Serial);
   Serial.println("esp32-faux86");
 
-#ifdef GFX_EXTRA_PRE_INIT
-  GFX_EXTRA_PRE_INIT();
-#endif
-
   Serial.println("Init display");
-  if (!gfx->begin(80000000)) {
+  if (!gfx->begin(TFT_SPEED_HZ)) {
     Serial.println("Init display failed!");
   }
   gfx->fillScreen(BLACK);
 
-#ifdef GFX_BL
-  pinMode(GFX_BL, OUTPUT);
-  digitalWrite(GFX_BL, HIGH);
+#ifdef TFT_BL
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, HIGH);
 #endif
 
+#if 0
   Wire.begin(TDECK_I2C_SDA, TDECK_I2C_SCL, TDECK_I2C_FREQ);
 
   Serial.println("Init touchscreen");
@@ -161,6 +185,7 @@ void setup() {
   attachInterrupt(TDECK_TRACKBALL_RIGHT, ISR_right, FALLING);
   pinMode(TDECK_TRACKBALL_CLICK, INPUT_PULLUP);
   attachInterrupt(TDECK_TRACKBALL_CLICK, ISR_click, FALLING);
+#endif
 
   if (!FFat.begin(false)) {
     Serial.println("ERROR: File system mount failed!");
@@ -229,6 +254,7 @@ void loop() {
 
   /* handle keyboard input */
   if (keyboard_interrupted || (millis() > next_key_scan_ms)) {
+#if 0
     Wire.requestFrom(TDECK_KEYBOARD_ADDR, 1);
     while (Wire.available() > 0) {
       char key = Wire.read();
@@ -241,9 +267,11 @@ void loop() {
         next_key_scan_ms = millis() + KEY_SCAN_MS_INTERVAL;
       }
     }
+#endif
     keyboard_interrupted = false;
   }
 
+#if 0
   /* handle trackball input */
   if (trackball_interrupted) {
     if (trackball_click_count > 0) {
@@ -271,4 +299,5 @@ void loop() {
       mouse_downed = false;
     }
   }
+#endif
 }
