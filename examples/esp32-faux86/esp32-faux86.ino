@@ -19,14 +19,41 @@
  * PSRAM:            "OPI PSRAM"
  ******************************************************************************/
 
+#include "SPI.h"
 #include <Arduino_GFX_Library.h>
+#include "Adafruit_TinyUSB.h"
 
 // mimic metro s3: TODO remove later
 #ifndef ARDUINO_METRO_ESP32S3
   #define ARDUINO_METRO_ESP32S3
 #endif
 
-#if defined(ARDUINO_ESP32_S3_BOX)
+#if defined(ARDUINO_METRO_ESP32S3)
+
+#define TFT_DC 9
+#define TFT_CS 10
+
+// conflict with usbh, use different spi for now
+//#define TFT_SCK 39
+//#define TFT_MOSI 42
+
+#define TFT_SCK 7
+#define TFT_MOSI 6
+
+#define TFT_RST -1
+//#define TFT_BL 45
+
+#define TFT_Controller Arduino_ILI9341
+#define TFT_SPEED_HZ (40*1000*1000ul)
+#define TFT_ROTATION 1
+
+#define MAX3421_SCK 39
+#define MAX3421_MOSI 42
+#define MAX3421_MISO 21
+#define MAX3421_CS 15
+#define MAX3421_INT 14
+
+#elif defined(ARDUINO_ESP32_S3_BOX)
 
 #define TFT_DC 4
 #define TFT_CS 5
@@ -36,24 +63,8 @@
 #define TFT_BL 45
 
 #define TFT_Controller Arduino_ILI9342
-#define TFT_SPEED_HZ (40*1000*1000ul)
-#define TFT_ROTATION 4
-
-#elif defined(ARDUINO_METRO_ESP32S3)
-
-#define TFT_DC 9
-#define TFT_CS 10
-// Feather
-//#define TFT_DC 10
-//#define TFT_CS 9
-#define TFT_SCK 39
-#define TFT_MOSI 42
-#define TFT_RST GFX_NOT_DEFINED
-//#define TFT_BL 45
-
-#define TFT_Controller Arduino_ILI9341
 #define TFT_SPEED_HZ (60*1000*1000ul)
-#define TFT_ROTATION 1
+#define TFT_ROTATION 4
 
 #else
 
@@ -72,8 +83,11 @@
 
 #endif
 
-Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI);
+//Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
+Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, false);
 Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST, TFT_ROTATION, false /* IPS */);
+
+Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
 
 #define TRACK_SPEED 2
 #define KEY_SCAN_MS_INTERVAL 200
@@ -141,12 +155,38 @@ Faux86::ArduinoHostSystemInterface hostInterface(gfx);
 
 uint16_t* vga_framebuffer;
 
+void usbhost_rtos_task(void *param) {
+  (void) param;
+  Serial.println("Init USBHost with MAX3421");
+  if (!USBHost.begin(1)) {
+    Serial.println("Failed to init USBHost");
+  }
+
+  while (1) {
+    USBHost.task();
+    Serial.println("usbh task");
+  }
+}
+
+void vm86_task(void *param) {
+  (void) param;
+  while (1) {
+    vm86->simulate();
+    // hostInterface.tick();
+
+    Serial.println("loop");
+  }
+}
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
 void setup() {
   WiFi.mode(WIFI_OFF);
 
   Serial.begin(115200);
   // Serial.setDebugOutput(true);
-  // while(!Serial);
+  // while(!Serial) delay(10);
   Serial.println("esp32-faux86");
 
   Serial.println("Init display");
@@ -246,12 +286,16 @@ void setup() {
   if (vm86->init()) {
     hostInterface.init(vm86);
   }
+
+  // Create a thread with high priority to run VM 86
+  xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 5, NULL, 1);
+
+  // since we don't use wifi in this example. We can use core0 to run usbhost
+  xTaskCreateUniversal(usbhost_rtos_task, "usbh", 4096, NULL, 3, NULL, 0);
 }
 
 void loop() {
-  vm86->simulate();
-  // hostInterface.tick();
-
+#if 0
   /* handle keyboard input */
   if (keyboard_interrupted || (millis() > next_key_scan_ms)) {
 #if 0
@@ -300,4 +344,65 @@ void loop() {
     }
   }
 #endif
+
+#endif
 }
+
+//--------------------------------------------------------------------+
+// TinyUSB Host callbacks
+//--------------------------------------------------------------------+
+extern "C"
+{
+
+// Invoked when device with hid interface is mounted
+// Report descriptor is also available for use.
+// tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
+// descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
+// it will be skipped therefore report_desc = NULL, desc_len = 0
+void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_report, uint16_t desc_len) {
+  (void) desc_report;
+  (void) desc_len;
+  uint16_t vid, pid;
+  tuh_vid_pid_get(dev_addr, &vid, &pid);
+
+  Serial.printf("HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
+  Serial.printf("VID = %04x, PID = %04x\r\n", vid, pid);
+
+  uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+  if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
+    Serial.printf("HID Keyboard\r\n");
+    if (!tuh_hid_receive_report(dev_addr, instance)) {
+      Serial.printf("Error: cannot request to receive report\r\n");
+    }
+  }
+}
+
+// Invoked when device with hid interface is un-mounted
+void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
+  Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+}
+
+void remap_key(hid_keyboard_report_t const *original_report, hid_keyboard_report_t *remapped_report) {
+  memcpy(remapped_report, original_report, sizeof(hid_keyboard_report_t));
+
+  // only remap if not empty report i.e key released
+  for (uint8_t i = 0; i < 6; i++) {
+    if (remapped_report->keycode[i] != 0) {
+      // Note: we ignore right shift here
+      remapped_report->modifier ^= KEYBOARD_MODIFIER_LEFTSHIFT;
+      break;
+    }
+  }
+}
+
+// Invoked when received report from device via interrupt endpoint
+void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
+  Serial.printf("HID report len = %u\r\n", len);
+
+  // continue to request to receive report
+  if (!tuh_hid_receive_report(dev_addr, instance)) {
+    Serial.printf("Error: cannot request to receive report\r\n");
+  }
+}
+
+} // extern "C"
