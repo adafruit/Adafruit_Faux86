@@ -44,7 +44,7 @@
 //#define TFT_BL 45
 
 #define TFT_Controller Arduino_ILI9341
-#define TFT_SPEED_HZ (40*1000*1000ul)
+#define TFT_SPEED_HZ (60*1000*1000ul)
 #define TFT_ROTATION 1
 
 #define MAX3421_SCK 39
@@ -83,8 +83,9 @@
 
 #endif
 
+// Arduino_ESP32SPIDMA won't work well together with max3421
 //Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
-Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, false);
+Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
 Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST, TFT_ROTATION, false /* IPS */);
 
 Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
@@ -96,8 +97,7 @@ Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX342
  * Please config the touch panel in touch.h
  ******************************************************************************/
 #include "touch.h"
-
-#include "keymap.h"
+#include "Keymap.h"
 
 #include <WiFi.h>
 #include <FFat.h>
@@ -155,7 +155,7 @@ Faux86::ArduinoHostSystemInterface hostInterface(gfx);
 
 uint16_t* vga_framebuffer;
 
-void usbhost_rtos_task(void *param) {
+void usbhost_task(void* param) {
   (void) param;
   Serial.println("Init USBHost with MAX3421");
   if (!USBHost.begin(1)) {
@@ -164,17 +164,15 @@ void usbhost_rtos_task(void *param) {
 
   while (1) {
     USBHost.task();
-    Serial.println("usbh task");
   }
 }
 
-void vm86_task(void *param) {
+void vm86_task(void* param) {
   (void) param;
   while (1) {
     vm86->simulate();
     // hostInterface.tick();
-
-    Serial.println("loop");
+    delay(1);
   }
 }
 
@@ -291,7 +289,7 @@ void setup() {
   xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 5, NULL, 1);
 
   // since we don't use wifi in this example. We can use core0 to run usbhost
-  xTaskCreateUniversal(usbhost_rtos_task, "usbh", 4096, NULL, 3, NULL, 0);
+  xTaskCreateUniversal(usbhost_task, "usbh", 4096, NULL, 3, NULL, 0);
 }
 
 void loop() {
@@ -353,24 +351,18 @@ void loop() {
 //--------------------------------------------------------------------+
 extern "C"
 {
-
 // Invoked when device with hid interface is mounted
 // Report descriptor is also available for use.
 // tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
 // descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
 // it will be skipped therefore report_desc = NULL, desc_len = 0
-void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_report, uint16_t desc_len) {
+void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len) {
   (void) desc_report;
   (void) desc_len;
-  uint16_t vid, pid;
-  tuh_vid_pid_get(dev_addr, &vid, &pid);
-
-  Serial.printf("HID device address = %d, instance = %d is mounted\r\n", dev_addr, instance);
-  Serial.printf("VID = %04x, PID = %04x\r\n", vid, pid);
 
   uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
   if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
-    Serial.printf("HID Keyboard\r\n");
+    Serial.printf("HID Keyboard mounted\r\n");
     if (!tuh_hid_receive_report(dev_addr, instance)) {
       Serial.printf("Error: cannot request to receive report\r\n");
     }
@@ -382,22 +374,72 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
   Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
 }
 
-void remap_key(hid_keyboard_report_t const *original_report, hid_keyboard_report_t *remapped_report) {
-  memcpy(remapped_report, original_report, sizeof(hid_keyboard_report_t));
-
-  // only remap if not empty report i.e key released
+// look up new key in previous keys
+bool find_key_in_report(hid_keyboard_report_t const* report, uint8_t keycode) {
   for (uint8_t i = 0; i < 6; i++) {
-    if (remapped_report->keycode[i] != 0) {
-      // Note: we ignore right shift here
-      remapped_report->modifier ^= KEYBOARD_MODIFIER_LEFTSHIFT;
-      break;
+    if (report->keycode[i] == keycode) return true;
+  }
+  return false;
+}
+
+void process_kbd_report(hid_keyboard_report_t const* report) {
+  // previous report to check key released
+  static hid_keyboard_report_t prev_report = { 0, 0, { 0 } };
+
+  // modifier
+  for (uint8_t i = 0; i < 8; i++) {
+    uint8_t const mask = 1 << i;
+    uint8_t const new_modifier = report->modifier & mask;
+    uint8_t const old_modifier = prev_report.modifier & mask;
+    if (new_modifier != old_modifier) {
+      // modifier change
+      if (new_modifier) {
+        vm86->input.handleKeyDown(modifier2xtMapping[i]);
+      } else {
+        vm86->input.handleKeyUp(modifier2xtMapping[i]);
+      }
+
+      vm86->input.tick();
     }
   }
+
+  // keycode
+  for (uint8_t i = 0; i < 6; i++) {
+    // new key pressed
+    uint8_t const new_key = report->keycode[i];
+    if (new_key && !find_key_in_report(&prev_report, new_key)) {
+      vm86->input.handleKeyDown(usb2xtMapping[new_key]);
+      vm86->input.tick();
+    }
+
+    // old key released
+    uint8_t const old_key = prev_report.keycode[i];
+    if (old_key && !find_key_in_report(report, old_key)) {
+      vm86->input.handleKeyUp(usb2xtMapping[old_key]);
+      vm86->input.tick();
+    }
+  }
+
+  prev_report = *report;
 }
 
 // Invoked when received report from device via interrupt endpoint
-void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
-  Serial.printf("HID report len = %u\r\n", len);
+void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
+  (void) len;
+  uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+
+  switch (itf_protocol) {
+    case HID_ITF_PROTOCOL_KEYBOARD:
+      process_kbd_report((hid_keyboard_report_t const*) report);
+      break;
+
+    case HID_ITF_PROTOCOL_MOUSE:
+      // process_mouse_report((hid_mouse_report_t const *) report);
+      break;
+
+    default:
+      break;
+  }
 
   // continue to request to receive report
   if (!tuh_hid_receive_report(dev_addr, instance)) {
