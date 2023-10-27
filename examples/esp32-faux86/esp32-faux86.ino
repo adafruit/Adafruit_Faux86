@@ -68,8 +68,6 @@
 
 #else
 
-// #include "TDECK_PINS.h"
-
 #define TFT_DC 11
 #define TFT_CS 12
 #define TFT_SCK 40
