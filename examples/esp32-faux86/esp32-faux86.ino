@@ -28,17 +28,21 @@
   #define ARDUINO_METRO_ESP32S3
 #endif
 
+//#define TFT_USBH_SHARED_SPI
+
 #if defined(ARDUINO_METRO_ESP32S3)
 
 #define TFT_DC 9
 #define TFT_CS 10
 
 // conflict with usbh, use different spi for now
-//#define TFT_SCK 39
-//#define TFT_MOSI 42
-
-#define TFT_SCK 7
-#define TFT_MOSI 6
+#ifdef TFT_USBH_SHARED_SPI
+  #define TFT_SCK 39
+  #define TFT_MOSI 42
+#else
+  #define TFT_SCK 7
+  #define TFT_MOSI 6
+#endif
 
 #define TFT_RST -1
 //#define TFT_BL 45
@@ -86,7 +90,12 @@
 Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
 Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST, TFT_ROTATION, false /* IPS */);
 
+#ifdef TFT_USBH_SHARED_SPI
+SPIClass max3421SPI(HSPI);
+Adafruit_USBH_Host USBHost(&max3421SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
+#else
 Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
+#endif
 
 #define TRACK_SPEED 2
 #define KEY_SCAN_MS_INTERVAL 200
@@ -260,14 +269,14 @@ void setup() {
   attachInterrupt(TDECK_TRACKBALL_CLICK, ISR_click, FALLING);
 #endif
 
+  // Create a thread with high priority to run VM 86
+  // Fpr S3" since we don't use wifi in this example. We can it on core0
+  xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 10, NULL, 0);
+
   Serial.println("Init USBHost with MAX3421");
   if (!USBHost.begin(1)) {
     Serial.println("Failed to init USBHost");
   }
-
-  // Create a thread with high priority to run VM 86
-  // Fpr S3" since we don't use wifi in this example. We can it on core0
-  xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 10, NULL, 0);
 }
 
 void loop() {
@@ -385,6 +394,7 @@ void process_kbd_report(hid_keyboard_report_t const* report) {
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
   (void) len;
   uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+  Serial.printf("HID report len = %u\r\n", len);
 
   switch (itf_protocol) {
     case HID_ITF_PROTOCOL_KEYBOARD:
