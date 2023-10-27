@@ -97,9 +97,6 @@ Adafruit_USBH_Host USBHost(&max3421SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO,
 Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
 #endif
 
-#define TRACK_SPEED 2
-#define KEY_SCAN_MS_INTERVAL 200
-
 /*******************************************************************************
  * Please config the touch panel in touch.h
  ******************************************************************************/
@@ -115,6 +112,7 @@ Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX342
 #include "rombasic_bin.h"
 #include "videorom_bin.h"
 
+#define TRACK_SPEED 2
 bool trackball_interrupted = false;
 int16_t trackball_up_count = 1;
 int16_t trackball_down_count = 1;
@@ -394,7 +392,7 @@ void process_kbd_report(hid_keyboard_report_t const* report) {
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
   (void) len;
   uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
-  Serial.printf("HID report len = %u\r\n", len);
+//  Serial.printf("HID report len = %u\r\n", len);
 
   switch (itf_protocol) {
     case HID_ITF_PROTOCOL_KEYBOARD:
