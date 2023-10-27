@@ -108,13 +108,6 @@ Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX342
 #include "rombasic_bin.h"
 #include "videorom_bin.h"
 
-bool keyboard_interrupted = false;
-
-void IRAM_ATTR ISR_key() {
-  keyboard_interrupted = true;
-}
-
-unsigned long next_key_scan_ms = 0;
 bool trackball_interrupted = false;
 int16_t trackball_up_count = 1;
 int16_t trackball_down_count = 1;
@@ -155,75 +148,8 @@ Faux86::ArduinoHostSystemInterface hostInterface(gfx);
 
 uint16_t* vga_framebuffer;
 
-void usbhost_task(void* param) {
-  (void) param;
-  Serial.println("Init USBHost with MAX3421");
-  if (!USBHost.begin(1)) {
-    Serial.println("Failed to init USBHost");
-  }
-
-  while (1) {
-    USBHost.task();
-  }
-}
-
 void vm86_task(void* param) {
   (void) param;
-  while (1) {
-    vm86->simulate();
-    // hostInterface.tick();
-    delay(1);
-  }
-}
-
-//--------------------------------------------------------------------+
-//
-//--------------------------------------------------------------------+
-void setup() {
-  WiFi.mode(WIFI_OFF);
-
-  Serial.begin(115200);
-  // Serial.setDebugOutput(true);
-  // while(!Serial) delay(10);
-  Serial.println("esp32-faux86");
-
-  Serial.println("Init display");
-  if (!gfx->begin(TFT_SPEED_HZ)) {
-    Serial.println("Init display failed!");
-  }
-  gfx->fillScreen(BLACK);
-
-#ifdef TFT_BL
-  pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, HIGH);
-#endif
-
-#if 0
-  Wire.begin(TDECK_I2C_SDA, TDECK_I2C_SCL, TDECK_I2C_FREQ);
-
-  Serial.println("Init touchscreen");
-  touch_init(gfx->width(), gfx->height(), gfx->getRotation());
-
-  Serial.println("Init LILYGO Keyboard");
-  pinMode(TDECK_KEYBOARD_INT, INPUT_PULLUP);
-  attachInterrupt(TDECK_KEYBOARD_INT, ISR_key, FALLING);
-  Wire.requestFrom(TDECK_KEYBOARD_ADDR, 1);
-  if (Wire.read() == -1) {
-    Serial.println("LILYGO Keyboad not online!");
-  }
-
-  // Init trackball
-  pinMode(TDECK_TRACKBALL_UP, INPUT_PULLUP);
-  attachInterrupt(TDECK_TRACKBALL_UP, ISR_up, FALLING);
-  pinMode(TDECK_TRACKBALL_DOWN, INPUT_PULLUP);
-  attachInterrupt(TDECK_TRACKBALL_DOWN, ISR_down, FALLING);
-  pinMode(TDECK_TRACKBALL_LEFT, INPUT_PULLUP);
-  attachInterrupt(TDECK_TRACKBALL_LEFT, ISR_left, FALLING);
-  pinMode(TDECK_TRACKBALL_RIGHT, INPUT_PULLUP);
-  attachInterrupt(TDECK_TRACKBALL_RIGHT, ISR_right, FALLING);
-  pinMode(TDECK_TRACKBALL_CLICK, INPUT_PULLUP);
-  attachInterrupt(TDECK_TRACKBALL_CLICK, ISR_click, FALLING);
-#endif
 
   if (!FFat.begin(false)) {
     Serial.println("ERROR: File system mount failed!");
@@ -285,33 +211,69 @@ void setup() {
     hostInterface.init(vm86);
   }
 
-  // Create a thread with high priority to run VM 86
-  xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 5, NULL, 1);
+  while (1) {
+    vm86->simulate();
+    // hostInterface.tick();
 
-  // since we don't use wifi in this example. We can use core0 to run usbhost
-  xTaskCreateUniversal(usbhost_task, "usbh", 4096, NULL, 3, NULL, 0);
+    // simulated() call yield() inside but since this is highest priority task
+    // we should call delay(1) to allow other task to run
+    delay(1);
+  }
+}
+
+//--------------------------------------------------------------------+
+//
+//--------------------------------------------------------------------+
+void setup() {
+  WiFi.mode(WIFI_OFF);
+
+  Serial.begin(115200);
+  // Serial.setDebugOutput(true);
+  // while(!Serial) delay(10);
+  Serial.println("esp32-faux86");
+
+  Serial.println("Init display");
+  if (!gfx->begin(TFT_SPEED_HZ)) {
+    Serial.println("Init display failed!");
+  }
+  gfx->fillScreen(BLACK);
+
+#ifdef TFT_BL
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, HIGH);
+#endif
+
+#if 0
+  Wire.begin(TDECK_I2C_SDA, TDECK_I2C_SCL, TDECK_I2C_FREQ);
+
+  Serial.println("Init touchscreen");
+  touch_init(gfx->width(), gfx->height(), gfx->getRotation());
+
+  // Init trackball
+  pinMode(TDECK_TRACKBALL_UP, INPUT_PULLUP);
+  attachInterrupt(TDECK_TRACKBALL_UP, ISR_up, FALLING);
+  pinMode(TDECK_TRACKBALL_DOWN, INPUT_PULLUP);
+  attachInterrupt(TDECK_TRACKBALL_DOWN, ISR_down, FALLING);
+  pinMode(TDECK_TRACKBALL_LEFT, INPUT_PULLUP);
+  attachInterrupt(TDECK_TRACKBALL_LEFT, ISR_left, FALLING);
+  pinMode(TDECK_TRACKBALL_RIGHT, INPUT_PULLUP);
+  attachInterrupt(TDECK_TRACKBALL_RIGHT, ISR_right, FALLING);
+  pinMode(TDECK_TRACKBALL_CLICK, INPUT_PULLUP);
+  attachInterrupt(TDECK_TRACKBALL_CLICK, ISR_click, FALLING);
+#endif
+
+  Serial.println("Init USBHost with MAX3421");
+  if (!USBHost.begin(1)) {
+    Serial.println("Failed to init USBHost");
+  }
+
+  // Create a thread with high priority to run VM 86
+  // Fpr S3" since we don't use wifi in this example. We can it on core0
+  xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 10, NULL, 0);
 }
 
 void loop() {
-#if 0
-  /* handle keyboard input */
-  if (keyboard_interrupted || (millis() > next_key_scan_ms)) {
-#if 0
-    Wire.requestFrom(TDECK_KEYBOARD_ADDR, 1);
-    while (Wire.available() > 0) {
-      char key = Wire.read();
-      if (key != 0) {
-        uint16_t keyxt = ascii2xtMapping[key];
-        // Serial.printf("key: %c, keyxt: %0x\n", key, keyxt);
-        vm86->input.handleKeyDown(keyxt);
-        vm86->simulate();
-        vm86->input.handleKeyUp(keyxt);
-        next_key_scan_ms = millis() + KEY_SCAN_MS_INTERVAL;
-      }
-    }
-#endif
-    keyboard_interrupted = false;
-  }
+  USBHost.task();
 
 #if 0
   /* handle trackball input */
@@ -341,8 +303,6 @@ void loop() {
       mouse_downed = false;
     }
   }
-#endif
-
 #endif
 }
 
