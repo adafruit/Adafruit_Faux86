@@ -85,7 +85,7 @@
 
 #endif
 
-// Arduino_ESP32SPIDMA won't work well together with max3421
+// Arduino_ESP32SPIDMA won't work well together with max3421 (cannot regconize usb device)
 //Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
 Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
 Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST, TFT_ROTATION, false /* IPS */);
@@ -150,6 +150,7 @@ void IRAM_ATTR ISR_click() {
 
 Faux86::VM* vm86;
 Faux86::ArduinoHostSystemInterface hostInterface(gfx);
+Faux86::Config vmConfig(&hostInterface);
 
 uint16_t* vga_framebuffer;
 
@@ -159,8 +160,6 @@ void vm86_task(void* param) {
   if (!FFat.begin(false)) {
     Serial.println("ERROR: File system mount failed!");
   }
-
-  Faux86::Config vmConfig(&hostInterface);
 
   /* CPU settings */
   vmConfig.singleThreaded = true; // only WIN32 support multithreading
@@ -201,7 +200,8 @@ void vm86_task(void* param) {
   //vmConfig.diskDriveA = hostInterface.openFile("/ffat/fd0.img");
 
   /* harddisk drive image */
-  vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_win30.img");
+  //vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_win30.img");
+  vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_games.img");
 
   /* set boot drive */
   vmConfig.setBootDrive("hd0");
@@ -221,8 +221,8 @@ void vm86_task(void* param) {
     // hostInterface.tick();
 
     // simulated() call yield() inside but since this is highest priority task
-    // we should call delay(1) to allow other task to run
-    delay(1);
+    // we should call vTaskDelay(1) to allow other task to run
+    vTaskDelay(1);
   }
 }
 
@@ -311,43 +311,15 @@ void loop() {
 #endif
 }
 
-//--------------------------------------------------------------------+
-// TinyUSB Host callbacks
-//--------------------------------------------------------------------+
-extern "C"
-{
-// Invoked when device with hid interface is mounted
-// Report descriptor is also available for use.
-// tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
-// descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
-// it will be skipped therefore report_desc = NULL, desc_len = 0
-void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len) {
-  (void) desc_report;
-  (void) desc_len;
-
-  uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
-  if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
-    Serial.printf("HID Keyboard mounted\r\n");
-    if (!tuh_hid_receive_report(dev_addr, instance)) {
-      Serial.printf("Error: cannot request to receive report\r\n");
-    }
-  }
-}
-
-// Invoked when device with hid interface is un-mounted
-void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
-  Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
-}
-
 // look up new key in previous keys
-bool find_key_in_report(hid_keyboard_report_t const* report, uint8_t keycode) {
+static bool find_key_in_report(hid_keyboard_report_t const* report, uint8_t keycode) {
   for (uint8_t i = 0; i < 6; i++) {
     if (report->keycode[i] == keycode) return true;
   }
   return false;
 }
 
-void process_kbd_report(hid_keyboard_report_t const* report) {
+static void process_kbd_report(hid_keyboard_report_t const* report) {
   // previous report to check key released
   static hid_keyboard_report_t prev_report = { 0, 0, { 0 } };
 
@@ -386,6 +358,35 @@ void process_kbd_report(hid_keyboard_report_t const* report) {
   }
 
   prev_report = *report;
+}
+
+//--------------------------------------------------------------------+
+// TinyUSB Host callbacks
+//--------------------------------------------------------------------+
+
+extern "C"
+{
+// Invoked when device with hid interface is mounted
+// Report descriptor is also available for use.
+// tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
+// descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
+// it will be skipped therefore report_desc = NULL, desc_len = 0
+void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len) {
+  (void) desc_report;
+  (void) desc_len;
+
+  uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+  if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
+    Serial.printf("HID Keyboard mounted\r\n");
+    if (!tuh_hid_receive_report(dev_addr, instance)) {
+      Serial.printf("Error: cannot request to receive report\r\n");
+    }
+  }
+}
+
+// Invoked when device with hid interface is un-mounted
+void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
+  Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
 }
 
 // Invoked when received report from device via interrupt endpoint
