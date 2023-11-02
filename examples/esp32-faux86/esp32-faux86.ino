@@ -21,85 +21,43 @@
 
 #include "SPI.h"
 #include "Adafruit_GFX.h"
-#include "Adafruit_ILI9341.h"
-#include <Arduino_GFX_Library.h>
-
 #include "Adafruit_TinyUSB.h"
 
-// mimic metro s3: TODO remove later
-//#ifndef ARDUINO_METRO_ESP32S3
-//  #define ARDUINO_METRO_ESP32S3
-//#endif
-
-#if defined(ARDUINO_METRO_ESP32S3)
-
-#define TFT_DC 9
-#define TFT_CS 10
-
-// conflict with usbh, use different spi for now
-#ifdef TFT_USBH_SHARED_SPI
-  #define TFT_SCK 39
-  #define TFT_MOSI 42
-#else
+#if defined(ARDUINO_ESP32_S3_BOX)
+  #define TFT_DC 4
+  #define TFT_CS 5
   #define TFT_SCK 7
   #define TFT_MOSI 6
-#endif
+  #define TFT_RST 48
+  #define TFT_BL 45
 
-#define TFT_RST -1
-//#define TFT_BL 45
+  #define TFT_SPEED_HZ (60*1000*1000ul)
+  #define TFT_ROTATION 4
 
-#define TFT_Controller Arduino_ILI9341
-#define TFT_SPEED_HZ (60*1000*1000ul)
-#define TFT_ROTATION 1
-
-#define MAX3421_SCK 39
-#define MAX3421_MOSI 42
-#define MAX3421_MISO 21
-#define MAX3421_CS 15
-#define MAX3421_INT 14
-
-#elif defined(ARDUINO_ESP32_S3_BOX)
-
-#define TFT_DC 4
-#define TFT_CS 5
-#define TFT_SCK 7
-#define TFT_MOSI 6
-#define TFT_RST 48
-#define TFT_BL 45
-
-#define TFT_Controller Arduino_ILI9342
-#define TFT_SPEED_HZ (60*1000*1000ul)
-#define TFT_ROTATION 4
+  #include <Arduino_GFX_Library.h>
+  Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, FSPI, true);
+  Arduino_TFT* gfx = new Arduino_ILI9342(bus, TFT_RST);
 
 #else
+  #define TFT_DC 9
+  #define TFT_CS 10
+  #define TFT_SCK SCK
+  #define TFT_MOSI MOSI
+  #define TFT_RST -1
+  #define TFT_BL -1
 
-#define TFT_DC 9
-#define TFT_CS 10
-#define TFT_SCK SCK
-#define TFT_MOSI MOSI
+  #define TFT_SPEED_HZ (60*1000*1000ul)
+  #define TFT_ROTATION 1
 
-#define TFT_RST -1
-#define TFT_BL 45
+  #include "Adafruit_ILI9341.h"
+  Adafruit_SPITFT* gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
 
-#define MAX3421_SCK SCK
-#define MAX3421_MOSI MOSI
-#define MAX3421_MISO MISO
-#define MAX3421_CS 15
-#define MAX3421_INT 14
+  #define MAX3421_SCK SCK
+  #define MAX3421_MOSI MOSI
+  #define MAX3421_MISO MISO
+  #define MAX3421_CS 15
+  #define MAX3421_INT 14
 
-#define TFT_Controller Arduino_ILI9341
-#define TFT_SPEED_HZ (60*1000*1000ul)
-#define TFT_ROTATION 1
-
-#endif
-
-#define USE_ADAFRUIT_TFT
-
-#ifdef USE_ADAFRUIT_TFT
-Adafruit_SPITFT* gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
-#else
-Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, FSPI, true);
-Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST);
 #endif
 
 Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
@@ -249,7 +207,7 @@ void setup() {
   gfx->setRotation(TFT_ROTATION);
   gfx->fillScreen(BLACK);
 
-#ifdef TFT_BL
+#if defined(TFT_BL) && (TFT_BL != -1)
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, HIGH);
 #endif
