@@ -32,15 +32,20 @@ bool sdlconsole_ctrl = 0;
 bool sdlconsole_alt = 0;
 
 ArduinoHostSystemInterface::ArduinoHostSystemInterface(Arduino_TFT *gfx)
-		: _gfx(gfx)
+		: _arduino_gfx(gfx)
 {
 	log_d("ArduinoHostSystemInterface::ArduinoHostSystemInterface()");
+}
+
+ArduinoHostSystemInterface::ArduinoHostSystemInterface(Adafruit_SPITFT *gfx)
+ : _adafruit_gfx(gfx) {
 }
 
 void ArduinoHostSystemInterface::init(VM *inVM)
 {
 	log_d("ArduinoHostSystemInterface::init(VM *inVM)");
-	frameBufferInterface.setGfx(_gfx);
+	frameBufferInterface.setGfx(_arduino_gfx);
+  frameBufferInterface.setGfx(_adafruit_gfx);
 }
 
 void ArduinoHostSystemInterface::resize(uint32_t desiredWidth, uint32_t desiredHeight)
@@ -77,7 +82,11 @@ DiskInterface *ArduinoHostSystemInterface::openFile(const char *filename)
 void ArduinoFrameBufferInterface::setGfx(Arduino_TFT *gfx)
 {
 	log_d("ArduinoFrameBufferInterface::setGfx(Arduino_TFT *gfx)");
-	_gfx = gfx;
+  _arduino_gfx = gfx;
+}
+
+void ArduinoFrameBufferInterface::setGfx(Adafruit_SPITFT *gfx) {
+  _adafruit_gfx = gfx;
 }
 
 RenderSurface *ArduinoFrameBufferInterface::getSurface()
@@ -119,24 +128,39 @@ void ArduinoFrameBufferInterface::blit(uint16_t *pixels, int w, int h, int strid
 		_rowBuf = (uint16_t *)malloc(VGA_FRAMEBUFFER_WIDTH);
 	}
 
-	_gfx->startWrite();
-	_gfx->writeAddrWindow(0, 0, wQuad, hQuad);
-	uint16_t p;
-	while (hQuad--)
-	{
-		for (int16_t i = 0; i < wQuad; ++i)
-		{
-			p = (*row1++ & 0b1110011110011100) >> 2;
-			p += (*row1++ & 0b1110011110011100) >> 2;
-			p += (*row2++ & 0b1110011110011100) >> 2;
-			p += (*row2++ & 0b1110011110011100) >> 2;
-			_rowBuf[i] = p;
-		}
-		_gfx->writePixels(_rowBuf, wQuad);
-		row1 += xSkip;
-		row2 += xSkip;
-	}
-	_gfx->endWrite();
+  if (_arduino_gfx) {
+    _arduino_gfx->startWrite();
+    _arduino_gfx->writeAddrWindow(0, 0, wQuad, hQuad);
+  } else if (_adafruit_gfx) {
+    _adafruit_gfx->startWrite();
+    _adafruit_gfx->setAddrWindow(0, 0, wQuad, hQuad);
+  }
+
+  uint16_t p;
+  while (hQuad--) {
+    for (int16_t i = 0; i < wQuad; ++i) {
+      p  = (*row1++ & 0b1110011110011100) >> 2;
+      p += (*row1++ & 0b1110011110011100) >> 2;
+      p += (*row2++ & 0b1110011110011100) >> 2;
+      p += (*row2++ & 0b1110011110011100) >> 2;
+      _rowBuf[i] = p;
+    }
+
+    if (_arduino_gfx) {
+      _arduino_gfx->writePixels(_rowBuf, wQuad);
+    } else if (_adafruit_gfx) {
+      _adafruit_gfx->writePixels(_rowBuf, wQuad);
+    }
+
+    row1 += xSkip;
+    row2 += xSkip;
+  }
+
+  if (_arduino_gfx) {
+    _arduino_gfx->endWrite();
+  } else if (_adafruit_gfx) {
+    _adafruit_gfx->endWrite();
+  }
 }
 
 uint64_t ArduinoTimerInterface::getHostFreq()

@@ -23,6 +23,7 @@
 #pragma once
 
 #include <Arduino_TFT.h>
+#include <Adafruit_SPITFT.h>
 #include <VM.h>
 #include <sys/time.h>
 #include "StdioDiskInterface.h"
@@ -33,6 +34,7 @@ namespace Faux86
 	{
 	public:
 		virtual void setGfx(Arduino_TFT *gfx);
+    virtual void setGfx(Adafruit_SPITFT *gfx);
 		virtual RenderSurface *getSurface() override;
 		virtual void setPalette(Palette *palette) override;
 		virtual void blit(uint16_t *pixels, int w, int h, int stride) override;
@@ -40,7 +42,8 @@ namespace Faux86
 	private:
 		RenderSurface renderSurface;
 
-		Arduino_TFT *_gfx;
+		Arduino_TFT *_arduino_gfx;
+    Adafruit_SPITFT* _adafruit_gfx;
 		uint16_t *_rowBuf;
 	};
 
@@ -65,6 +68,7 @@ namespace Faux86
 	{
 	public:
 		ArduinoHostSystemInterface(Arduino_TFT *gfx);
+    ArduinoHostSystemInterface(Adafruit_SPITFT *gfx);
 		virtual ~ArduinoHostSystemInterface();
 		virtual void init(VM *inVM) override;
 		virtual void resize(uint32_t desiredWidth, uint32_t desiredHeight) override;
@@ -81,6 +85,7 @@ namespace Faux86
 		ArduinoFrameBufferInterface frameBufferInterface;
 		ArduinoTimerInterface timerInterface;
 
-		Arduino_TFT *_gfx;
+		Arduino_TFT *_arduino_gfx;
+    Adafruit_SPITFT* _adafruit_gfx;
 	};
 };
