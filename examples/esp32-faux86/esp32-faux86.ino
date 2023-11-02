@@ -20,15 +20,16 @@
  ******************************************************************************/
 
 #include "SPI.h"
+#include "Adafruit_GFX.h"
+#include "Adafruit_ILI9341.h"
 #include <Arduino_GFX_Library.h>
+
 #include "Adafruit_TinyUSB.h"
 
 // mimic metro s3: TODO remove later
-#ifndef ARDUINO_METRO_ESP32S3
-  #define ARDUINO_METRO_ESP32S3
-#endif
-
-//#define TFT_USBH_SHARED_SPI
+//#ifndef ARDUINO_METRO_ESP32S3
+//  #define ARDUINO_METRO_ESP32S3
+//#endif
 
 #if defined(ARDUINO_METRO_ESP32S3)
 
@@ -72,30 +73,36 @@
 
 #else
 
-#define TFT_DC 11
-#define TFT_CS 12
-#define TFT_SCK 40
-#define TFT_MOSI 41
-#define TFT_RST GFX_NOT_DEFINED
-#define TFT_BL 42
+#define TFT_DC 9
+#define TFT_CS 10
+#define TFT_SCK SCK
+#define TFT_MOSI MOSI
 
-#define TFT_Controller Arduino_ST7789
-#define TFT_SPEED_HZ (80*1000*1000ul)
+#define TFT_RST -1
+#define TFT_BL 45
+
+#define MAX3421_SCK SCK
+#define MAX3421_MOSI MOSI
+#define MAX3421_MISO MISO
+#define MAX3421_CS 15
+#define MAX3421_INT 14
+
+#define TFT_Controller Arduino_ILI9341
+#define TFT_SPEED_HZ (60*1000*1000ul)
 #define TFT_ROTATION 1
 
 #endif
 
-// Arduino_ESP32SPIDMA won't work well together with max3421 (cannot regconize usb device)
-//Arduino_DataBus* bus = new Arduino_ESP32SPIDMA(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
-Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, HSPI, true);
-Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST, TFT_ROTATION, false /* IPS */);
+#define USE_ADAFRUIT_TFT
 
-#ifdef TFT_USBH_SHARED_SPI
-SPIClass max3421SPI(HSPI);
-Adafruit_USBH_Host USBHost(&max3421SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
+#ifdef USE_ADAFRUIT_TFT
+Adafruit_SPITFT* gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
 #else
-Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
+Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, FSPI, true);
+Arduino_TFT* gfx = new TFT_Controller(bus, TFT_RST);
 #endif
+
+Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
 
 /*******************************************************************************
  * Please config the touch panel in touch.h
@@ -238,9 +245,8 @@ void setup() {
   Serial.println("esp32-faux86");
 
   Serial.println("Init display");
-  if (!gfx->begin(TFT_SPEED_HZ)) {
-    Serial.println("Init display failed!");
-  }
+  gfx->begin(TFT_SPEED_HZ);
+  gfx->setRotation(TFT_ROTATION);
   gfx->fillScreen(BLACK);
 
 #ifdef TFT_BL
@@ -393,7 +399,7 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
   (void) len;
   uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
-//  Serial.printf("HID report len = %u\r\n", len);
+  // Serial.printf("HID report len = %u\r\n", len);
 
   switch (itf_protocol) {
     case HID_ITF_PROTOCOL_KEYBOARD:
