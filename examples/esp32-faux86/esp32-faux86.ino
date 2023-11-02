@@ -120,7 +120,7 @@ void vm86_task(void* param) {
   /* floppy drive image */
   //vmConfig.diskDriveA = hostInterface.openFile("/ffat/fd0.img");
 
-  /* harddisk drive image */
+  // harddisk drive image: can be found in disks/ folder
   //vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_win30.img");
   vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_games.img");
 
