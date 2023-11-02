@@ -5,9 +5,11 @@
  * https://github.com/moononournation/T-Deck/blob/main/esp32-faux86/esp32-faux86.ino
  *
  * Required libraries:
- * - Arduino_GFX: https://github.com/moononournation/Arduino_GFX.git
  * - Faux86-remake: https://github.com/moononournation/Faux86-remake.git
  *   Note: on Linux, you may need to make change as https://github.com/ArnoldUK/Faux86-remake/pull/5
+ * - Adafruit GFX: https://github.com/adafruit/Adafruit-GFX-Library and your specific TFT library controller
+ *   e.g. Adafruit_ILI9341
+ * - Arduino_GFX: https://github.com/moononournation/Arduino_GFX.git
  * - For uploading files to FFat: https://github.com/lorol/arduino-esp32fs-plugin
  *
  * Arduino IDE Settings for T-Deck
@@ -22,6 +24,8 @@
 #include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_TinyUSB.h"
+
+#include "Adafruit_Faux86.h"
 
 #if defined(ARDUINO_ESP32_S3_BOX)
   #define TFT_DC 4
@@ -62,56 +66,8 @@
 
 Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
 
-/*******************************************************************************
- * Please config the touch panel in touch.h
- ******************************************************************************/
-#include "touch.h"
-#include "Keymap.h"
-
 #include <WiFi.h>
 #include <FFat.h>
-#include <VM.h>
-
-#include "asciivga_dat.h"
-#include "pcxtbios_bin.h"
-#include "rombasic_bin.h"
-#include "videorom_bin.h"
-
-#define TRACK_SPEED 2
-bool trackball_interrupted = false;
-int16_t trackball_up_count = 1;
-int16_t trackball_down_count = 1;
-int16_t trackball_left_count = 1;
-int16_t trackball_right_count = 1;
-int16_t trackball_click_count = 0;
-bool mouse_downed = false;
-
-void IRAM_ATTR ISR_up() {
-  trackball_interrupted = true;
-  trackball_up_count <<= TRACK_SPEED;
-}
-
-void IRAM_ATTR ISR_down() {
-  trackball_interrupted = true;
-  trackball_down_count <<= TRACK_SPEED;
-}
-
-void IRAM_ATTR ISR_left() {
-  trackball_interrupted = true;
-  trackball_left_count <<= TRACK_SPEED;
-}
-
-void IRAM_ATTR ISR_right() {
-  trackball_interrupted = true;
-  trackball_right_count <<= TRACK_SPEED;
-}
-
-void IRAM_ATTR ISR_click() {
-  trackball_interrupted = true;
-  ++trackball_click_count;
-}
-
-#include "ArduinoInterface.h"
 
 Faux86::VM* vm86;
 Faux86::ArduinoHostSystemInterface hostInterface(gfx);
@@ -190,6 +146,46 @@ void vm86_task(void* param) {
     vTaskDelay(1);
   }
 }
+
+/*******************************************************************************
+ * Please config the touch panel in touch.h
+ ******************************************************************************/
+#include "touch.h"
+
+#define TRACK_SPEED 2
+bool trackball_interrupted = false;
+int16_t trackball_up_count = 1;
+int16_t trackball_down_count = 1;
+int16_t trackball_left_count = 1;
+int16_t trackball_right_count = 1;
+int16_t trackball_click_count = 0;
+bool mouse_downed = false;
+
+void IRAM_ATTR ISR_up() {
+  trackball_interrupted = true;
+  trackball_up_count <<= TRACK_SPEED;
+}
+
+void IRAM_ATTR ISR_down() {
+  trackball_interrupted = true;
+  trackball_down_count <<= TRACK_SPEED;
+}
+
+void IRAM_ATTR ISR_left() {
+  trackball_interrupted = true;
+  trackball_left_count <<= TRACK_SPEED;
+}
+
+void IRAM_ATTR ISR_right() {
+  trackball_interrupted = true;
+  trackball_right_count <<= TRACK_SPEED;
+}
+
+void IRAM_ATTR ISR_click() {
+  trackball_interrupted = true;
+  ++trackball_click_count;
+}
+
 
 //--------------------------------------------------------------------+
 //
