@@ -231,7 +231,7 @@ void setup() {
 #endif
 
   // Create a thread with high priority to run VM 86
-  // Fpr S3" since we don't use wifi in this example. We can it on core0
+  // For S3" since we don't use wifi in this example. We can it on core0
   xTaskCreateUniversal(vm86_task, "vm86", 8192, NULL, 10, NULL, 0);
 
   Serial.println("Init USBHost with MAX3421");
