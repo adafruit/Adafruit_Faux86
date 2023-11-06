@@ -2,7 +2,7 @@
 
 Adafruit_Faux86 is an Arduino library with example to run Faux86, based on excellent work at
 - https://github.com/moononournation/T-Deck/blob/main/esp32-faux86/esp32-faux86.ino
-- Faux86-remake: https://github.com/moononournation/Faux86-remake.git which is based on https://github.com/ArnoldUK/Faux86-remake
+- Faux86-remake: https://github.com/moononournation/Faux86-remake.git which is based on https://github.com/ArnoldUK/Faux86-remake. Note: on Linux, you may need to make change as https://github.com/ArnoldUK/Faux86-remake/pull/5
 
 Example can run MS-DOS 6.x + Windows 3.0 and can several DOS games such as Dangerous Dave (could hang after a while), Prince of Persia, Mario, Wolf3d etc ... and work with USB host shield (max3421e) to support USB keyboard, mouse.
 
@@ -32,7 +32,7 @@ sudo mount -o loop,offset=1048576,uid=1000,gid=1000 -t vfat /path/to/hd0_12m_dos
 ```
 
 To run example:
-- Fromm IDE menu select: 
+- From IDE menu select: 
   - "USB CDC On Boot:  "Enable"
   - Partition Scheme: "16M Flash(2M APP/12.5MB FATFS)"
 - uploaded one of img file in disks/ to ESP32-S3 using [arduino-esp32fs-plugin](https://github.com/lorol/arduino-esp32fs-plugin) 
