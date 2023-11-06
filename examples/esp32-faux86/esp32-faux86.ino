@@ -12,13 +12,16 @@
  * - Arduino_GFX: https://github.com/moononournation/Arduino_GFX.git
  * - For uploading files to FFat: https://github.com/lorol/arduino-esp32fs-plugin
  *
- * Arduino IDE Settings for T-Deck
+ * Arduino IDE Settings
  * Board:            "ESP32S3 Dev Module"
  * USB CDC On Boot:  "Enable"
- * Flash Mode:       "QIO 120MHz"
- * Flash Size:       "16MB(128Mb)"
  * Partition Scheme: "16M Flash(2M APP/12.5MB FATFS)"
- * PSRAM:            "OPI PSRAM"
+ *
+ * uploaded one of img file in disks/ to ESP32-S3 using [arduino-esp32fs-plugin](https://github.com/lorol/arduino-esp32fs-plugin)
+ * - Install arduino-esp32fs-plugin
+ * - Create a folder named "data" in the sketch folder
+ * - Copy one of the img file in disks/ to "data" folder
+ * - From IDE menu select: "Tools" -> "ESP32 Sketch Data Upload" then select "FatFS" then click "OK"
  ******************************************************************************/
 
 #include "SPI.h"
