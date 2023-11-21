@@ -22,7 +22,15 @@
 */
 #pragma once
 
+// Disable due to compile issue with arduino-esp32 3.0 with LIST_HEAD()
+// Arduino_DataBus.h:178:13: error: 'i80_device_list' has not been declared
+//  178 |   LIST_HEAD(i80_device_list, lcd_panel_io_i80_t)
+#define DISABLE_ARDUINO_TFT
+
+#ifndef DISABLE_ARDUINO_TFT
 #include <Arduino_TFT.h>
+#endif
+
 #include <Adafruit_SPITFT.h>
 #include <VM.h>
 #include <sys/time.h>
@@ -33,7 +41,9 @@ namespace Faux86
 	class ArduinoFrameBufferInterface : public FrameBufferInterface
 	{
 	public:
+#ifndef DISABLE_ARDUINO_TFT
 		virtual void setGfx(Arduino_TFT *gfx);
+#endif
     virtual void setGfx(Adafruit_SPITFT *gfx);
 		virtual RenderSurface *getSurface() override;
 		virtual void setPalette(Palette *palette) override;
@@ -42,7 +52,9 @@ namespace Faux86
 	private:
 		RenderSurface renderSurface;
 
+#ifndef DISABLE_ARDUINO_TFT
 		Arduino_TFT *_arduino_gfx;
+#endif
     Adafruit_SPITFT* _adafruit_gfx;
 		uint16_t *_rowBuf;
 	};
@@ -67,7 +79,9 @@ namespace Faux86
 	class ArduinoHostSystemInterface : public HostSystemInterface
 	{
 	public:
+#ifndef DISABLE_ARDUINO_TFT
 		ArduinoHostSystemInterface(Arduino_TFT *gfx);
+#endif
     ArduinoHostSystemInterface(Adafruit_SPITFT *gfx);
 		virtual ~ArduinoHostSystemInterface();
 		virtual void init(VM *inVM) override;
@@ -85,7 +99,9 @@ namespace Faux86
 		ArduinoFrameBufferInterface frameBufferInterface;
 		ArduinoTimerInterface timerInterface;
 
+#ifndef DISABLE_ARDUINO_TFT
 		Arduino_TFT *_arduino_gfx;
+#endif
     Adafruit_SPITFT* _adafruit_gfx;
 	};
 };
