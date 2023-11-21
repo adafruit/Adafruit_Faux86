@@ -31,11 +31,13 @@ using namespace Faux86;
 bool sdlconsole_ctrl = 0;
 bool sdlconsole_alt = 0;
 
+#ifndef DISABLE_ARDUINO_TFT
 ArduinoHostSystemInterface::ArduinoHostSystemInterface(Arduino_TFT *gfx)
 		: _arduino_gfx(gfx)
 {
 	log_d("ArduinoHostSystemInterface::ArduinoHostSystemInterface()");
 }
+#endif
 
 ArduinoHostSystemInterface::ArduinoHostSystemInterface(Adafruit_SPITFT *gfx)
  : _adafruit_gfx(gfx) {
@@ -44,7 +46,9 @@ ArduinoHostSystemInterface::ArduinoHostSystemInterface(Adafruit_SPITFT *gfx)
 void ArduinoHostSystemInterface::init(VM *inVM)
 {
 	log_d("ArduinoHostSystemInterface::init(VM *inVM)");
+#ifndef DISABLE_ARDUINO_TFT
 	frameBufferInterface.setGfx(_arduino_gfx);
+#endif
   frameBufferInterface.setGfx(_adafruit_gfx);
 }
 
@@ -79,11 +83,13 @@ DiskInterface *ArduinoHostSystemInterface::openFile(const char *filename)
 	return new StdioDiskInterface(filename);
 }
 
+#ifndef DISABLE_ARDUINO_TFT
 void ArduinoFrameBufferInterface::setGfx(Arduino_TFT *gfx)
 {
 	log_d("ArduinoFrameBufferInterface::setGfx(Arduino_TFT *gfx)");
   _arduino_gfx = gfx;
 }
+#endif
 
 void ArduinoFrameBufferInterface::setGfx(Adafruit_SPITFT *gfx) {
   _adafruit_gfx = gfx;
@@ -128,13 +134,16 @@ void ArduinoFrameBufferInterface::blit(uint16_t *pixels, int w, int h, int strid
 		_rowBuf = (uint16_t *)malloc(VGA_FRAMEBUFFER_WIDTH);
 	}
 
-  if (_arduino_gfx) {
-    _arduino_gfx->startWrite();
-    _arduino_gfx->writeAddrWindow(0, 0, wQuad, hQuad);
-  } else if (_adafruit_gfx) {
+  if (_adafruit_gfx) {
     _adafruit_gfx->startWrite();
     _adafruit_gfx->setAddrWindow(0, 0, wQuad, hQuad);
   }
+#ifndef DISABLE_ARDUINO_TFT
+  else if (_arduino_gfx) {
+    _arduino_gfx->startWrite();
+    _arduino_gfx->writeAddrWindow(0, 0, wQuad, hQuad);
+  }
+#endif
 
   uint16_t p;
   while (hQuad--) {
@@ -146,21 +155,27 @@ void ArduinoFrameBufferInterface::blit(uint16_t *pixels, int w, int h, int strid
       _rowBuf[i] = p;
     }
 
-    if (_arduino_gfx) {
-      _arduino_gfx->writePixels(_rowBuf, wQuad);
-    } else if (_adafruit_gfx) {
+    if (_adafruit_gfx) {
       _adafruit_gfx->writePixels(_rowBuf, wQuad);
     }
+    #ifndef DISABLE_ARDUINO_TFT
+    else if (_arduino_gfx) {
+      _arduino_gfx->writePixels(_rowBuf, wQuad);
+    }
+    #endif
 
     row1 += xSkip;
     row2 += xSkip;
   }
 
-  if (_arduino_gfx) {
-    _arduino_gfx->endWrite();
-  } else if (_adafruit_gfx) {
+  if (_adafruit_gfx) {
     _adafruit_gfx->endWrite();
   }
+  #ifndef DISABLE_ARDUINO_TFT
+  else if (_arduino_gfx) {
+    _arduino_gfx->endWrite();
+  }
+  #endif
 }
 
 uint64_t ArduinoTimerInterface::getHostFreq()

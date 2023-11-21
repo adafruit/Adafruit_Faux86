@@ -30,43 +30,24 @@
 
 #include "Adafruit_Faux86.h"
 
-#if defined(ARDUINO_ESP32_S3_BOX)
-  #define TFT_DC 4
-  #define TFT_CS 5
-  #define TFT_SCK 7
-  #define TFT_MOSI 6
-  #define TFT_RST 48
-  #define TFT_BL 45
+#define TFT_DC 11
+#define TFT_CS 12
+#define TFT_SCK SCK
+#define TFT_MOSI MOSI
+#define TFT_RST -1
+#define TFT_BL -1
 
-  #define TFT_SPEED_HZ (60*1000*1000ul)
-  #define TFT_ROTATION 4
+#define TFT_SPEED_HZ (60*1000*1000ul)
+#define TFT_ROTATION 1
 
-  #include <Arduino_GFX_Library.h>
-  Arduino_DataBus* bus = new Arduino_ESP32SPI(TFT_DC, TFT_CS, TFT_SCK, TFT_MOSI, -1, FSPI, true);
-  Arduino_TFT* gfx = new Arduino_ILI9342(bus, TFT_RST);
+#include "Adafruit_ILI9341.h"
+Adafruit_SPITFT* gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
 
-#else
-  #define TFT_DC 9
-  #define TFT_CS 10
-  #define TFT_SCK SCK
-  #define TFT_MOSI MOSI
-  #define TFT_RST -1
-  #define TFT_BL -1
-
-  #define TFT_SPEED_HZ (60*1000*1000ul)
-  #define TFT_ROTATION 1
-
-  #include "Adafruit_ILI9341.h"
-  Adafruit_SPITFT* gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
-
-  #define MAX3421_SCK SCK
-  #define MAX3421_MOSI MOSI
-  #define MAX3421_MISO MISO
-  #define MAX3421_CS 15
-  #define MAX3421_INT 14
-
-#endif
-
+#define MAX3421_SCK SCK
+#define MAX3421_MOSI MOSI
+#define MAX3421_MISO MISO
+#define MAX3421_CS 10
+#define MAX3421_INT 9
 Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
 
 #include <WiFi.h>
@@ -204,7 +185,7 @@ void setup() {
   Serial.println("Init display");
   gfx->begin(TFT_SPEED_HZ);
   gfx->setRotation(TFT_ROTATION);
-  gfx->fillScreen(BLACK);
+  gfx->fillScreen(0x000000); // black
 
 #if defined(TFT_BL) && (TFT_BL != -1)
   pinMode(TFT_BL, OUTPUT);
