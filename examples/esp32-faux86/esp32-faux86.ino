@@ -6,27 +6,31 @@
  *
  * Required libraries:
  * - Faux86-remake: https://github.com/moononournation/Faux86-remake.git
- *   Note: on Linux, you may need to make change as https://github.com/ArnoldUK/Faux86-remake/pull/5
- * - Adafruit GFX: https://github.com/adafruit/Adafruit-GFX-Library and your specific TFT library controller
- *   e.g. Adafruit_ILI9341
+ *   Note: on Linux, you may need to make change as
+ *https://github.com/ArnoldUK/Faux86-remake/pull/5
+ * - Adafruit GFX: https://github.com/adafruit/Adafruit-GFX-Library and your
+ *specific TFT library controller e.g. Adafruit_ILI9341
  * - Arduino_GFX: https://github.com/moononournation/Arduino_GFX.git
- * - For uploading files to FFat: https://github.com/lorol/arduino-esp32fs-plugin
+ * - For uploading files to FFat:
+ *https://github.com/lorol/arduino-esp32fs-plugin
  *
  * Arduino IDE Settings
  * Board:            "ESP32S3 Dev Module"
  * USB CDC On Boot:  "Enable"
  * Partition Scheme: "16M Flash(2M APP/12.5MB FATFS)"
  *
- * uploaded one of img file in disks/ to ESP32-S3 using [arduino-esp32fs-plugin](https://github.com/lorol/arduino-esp32fs-plugin)
+ * uploaded one of img file in disks/ to ESP32-S3 using
+ *[arduino-esp32fs-plugin](https://github.com/lorol/arduino-esp32fs-plugin)
  * - Install arduino-esp32fs-plugin
  * - Create a folder named "data" in the sketch folder
  * - Copy one of the img file in disks/ to "data" folder
- * - From IDE menu select: "Tools" -> "ESP32 Sketch Data Upload" then select "FatFS" then click "OK"
+ * - From IDE menu select: "Tools" -> "ESP32 Sketch Data Upload" then select
+ *"FatFS" then click "OK"
  ******************************************************************************/
 
-#include "SPI.h"
 #include "Adafruit_GFX.h"
 #include "Adafruit_TinyUSB.h"
+#include "SPI.h"
 
 #include "Adafruit_Faux86.h"
 
@@ -37,30 +41,31 @@
 #define TFT_RST -1
 #define TFT_BL -1
 
-#define TFT_SPEED_HZ (60*1000*1000ul)
+#define TFT_SPEED_HZ (60 * 1000 * 1000ul)
 #define TFT_ROTATION 1
 
 #include "Adafruit_ILI9341.h"
-Adafruit_SPITFT* gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
+Adafruit_SPITFT *gfx = new Adafruit_ILI9341(&SPI, TFT_DC, TFT_CS, TFT_RST);
 
 #define MAX3421_SCK SCK
 #define MAX3421_MOSI MOSI
 #define MAX3421_MISO MISO
 #define MAX3421_CS 10
 #define MAX3421_INT 9
-Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO, MAX3421_CS, MAX3421_INT);
+Adafruit_USBH_Host USBHost(&SPI, MAX3421_SCK, MAX3421_MOSI, MAX3421_MISO,
+                           MAX3421_CS, MAX3421_INT);
 
-#include <WiFi.h>
 #include <FFat.h>
+#include <WiFi.h>
 
-Faux86::VM* vm86;
+Faux86::VM *vm86;
 Faux86::ArduinoHostSystemInterface hostInterface(gfx);
 Faux86::Config vmConfig(&hostInterface);
 
-uint16_t* vga_framebuffer;
+uint16_t *vga_framebuffer;
 
-void vm86_task(void* param) {
-  (void) param;
+void vm86_task(void *param) {
+  (void)param;
 
   if (!FFat.begin(false)) {
     Serial.println("ERROR: File system mount failed!");
@@ -68,8 +73,9 @@ void vm86_task(void* param) {
 
   /* CPU settings */
   vmConfig.singleThreaded = true; // only WIN32 support multithreading
-  vmConfig.slowSystem = true;      // slow system will reserve more time for audio, if enabled
-  vmConfig.cpuSpeed = 0;          // no limit
+  vmConfig.slowSystem =
+      true; // slow system will reserve more time for audio, if enabled
+  vmConfig.cpuSpeed = 0; // no limit
 
   /* Video settings */
   vmConfig.frameDelay = 200; // 200ms 5fps
@@ -91,27 +97,30 @@ void vm86_task(void* param) {
 
   /* set Basic ROM */
   // vmConfig.romBasicFile = hostInterface.openFile("/ffat/rombasic.bin");
-  vmConfig.romBasicFile = new Faux86::EmbeddedDisk(rombasic_bin, rombasic_bin_len);
+  vmConfig.romBasicFile =
+      new Faux86::EmbeddedDisk(rombasic_bin, rombasic_bin_len);
 
   /* set Video ROM */
   // vmConfig.videoRomFile = hostInterface.openFile("/ffat/videorom.bin");
-  vmConfig.videoRomFile = new Faux86::EmbeddedDisk(videorom_bin, videorom_bin_len);
+  vmConfig.videoRomFile =
+      new Faux86::EmbeddedDisk(videorom_bin, videorom_bin_len);
 
   /* set ASCII FONT Data */
   // vmConfig.asciiFile = hostInterface.openFile("/ffat/asciivga.dat");
   vmConfig.asciiFile = new Faux86::EmbeddedDisk(asciivga_dat, asciivga_dat_len);
 
   /* floppy drive image */
-  //vmConfig.diskDriveA = hostInterface.openFile("/ffat/fd0.img");
+  // vmConfig.diskDriveA = hostInterface.openFile("/ffat/fd0.img");
 
   // harddisk drive image: can be found in disks/ folder
-  //vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_win30.img");
+  // vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_win30.img");
   vmConfig.diskDriveC = hostInterface.openFile("/ffat/hd0_12m_games.img");
 
   /* set boot drive */
   vmConfig.setBootDrive("hd0");
 
-  vga_framebuffer = (uint16_t*) calloc(VGA_FRAMEBUFFER_WIDTH * VGA_FRAMEBUFFER_HEIGHT, sizeof(uint16_t));
+  vga_framebuffer = (uint16_t *)calloc(
+      VGA_FRAMEBUFFER_WIDTH * VGA_FRAMEBUFFER_HEIGHT, sizeof(uint16_t));
   if (!vga_framebuffer) {
     Serial.println("Failed to allocate vga_framebuffer");
   }
@@ -169,7 +178,6 @@ void IRAM_ATTR ISR_click() {
   trackball_interrupted = true;
   ++trackball_click_count;
 }
-
 
 //--------------------------------------------------------------------+
 //
@@ -256,16 +264,18 @@ void loop() {
 }
 
 // look up new key in previous keys
-static bool find_key_in_report(hid_keyboard_report_t const* report, uint8_t keycode) {
+static bool find_key_in_report(hid_keyboard_report_t const *report,
+                               uint8_t keycode) {
   for (uint8_t i = 0; i < 6; i++) {
-    if (report->keycode[i] == keycode) return true;
+    if (report->keycode[i] == keycode)
+      return true;
   }
   return false;
 }
 
-static void process_kbd_report(hid_keyboard_report_t const* report) {
+static void process_kbd_report(hid_keyboard_report_t const *report) {
   // previous report to check key released
-  static hid_keyboard_report_t prev_report = { 0, 0, { 0 } };
+  static hid_keyboard_report_t prev_report = {0, 0, {0}};
 
   // modifier
   for (uint8_t i = 0; i < 8; i++) {
@@ -308,16 +318,16 @@ static void process_kbd_report(hid_keyboard_report_t const* report) {
 // TinyUSB Host callbacks
 //--------------------------------------------------------------------+
 
-extern "C"
-{
+extern "C" {
 // Invoked when device with hid interface is mounted
 // Report descriptor is also available for use.
 // tuh_hid_parse_report_descriptor() can be used to parse common/simple enough
 // descriptor. Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE,
 // it will be skipped therefore report_desc = NULL, desc_len = 0
-void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_report, uint16_t desc_len) {
-  (void) desc_report;
-  (void) desc_len;
+void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
+                      uint8_t const *desc_report, uint16_t desc_len) {
+  (void)desc_report;
+  (void)desc_len;
 
   uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
   if (itf_protocol == HID_ITF_PROTOCOL_KEYBOARD) {
@@ -330,26 +340,28 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc_re
 
 // Invoked when device with hid interface is un-mounted
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
-  Serial.printf("HID device address = %d, instance = %d is unmounted\r\n", dev_addr, instance);
+  Serial.printf("HID device address = %d, instance = %d is unmounted\r\n",
+                dev_addr, instance);
 }
 
 // Invoked when received report from device via interrupt endpoint
-void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
-  (void) len;
+void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
+                                uint8_t const *report, uint16_t len) {
+  (void)len;
   uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
   // Serial.printf("HID report len = %u\r\n", len);
 
   switch (itf_protocol) {
-    case HID_ITF_PROTOCOL_KEYBOARD:
-      process_kbd_report((hid_keyboard_report_t const*) report);
-      break;
+  case HID_ITF_PROTOCOL_KEYBOARD:
+    process_kbd_report((hid_keyboard_report_t const *)report);
+    break;
 
-    case HID_ITF_PROTOCOL_MOUSE:
-      // process_mouse_report((hid_mouse_report_t const *) report);
-      break;
+  case HID_ITF_PROTOCOL_MOUSE:
+    // process_mouse_report((hid_mouse_report_t const *) report);
+    break;
 
-    default:
-      break;
+  default:
+    break;
   }
 
   // continue to request to receive report

@@ -3,7 +3,7 @@
   Copyright (C)2018 James Howard
   Based on Fake86
   Copyright (C)2010-2013 Mike Chambers
-  
+
   Contributions and Updates (c)2023 Curtis aka ArnoldUK
 
   This program is free software; you can redistribute it and/or
@@ -18,7 +18,8 @@
 
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
-  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
+  USA.
 */
 #pragma once
 
@@ -26,25 +27,23 @@
 
 #include <stdio.h>
 
-#define fopen_s(fp, fmt, mode) *(fp)=fopen( (fmt), (mode))
- 
-namespace Faux86
-{
-	class StdioDiskInterface : public DiskInterface
-	{
-	public:
-		StdioDiskInterface(const char* filename);
-		virtual ~StdioDiskInterface();
-		virtual int read(uint8_t *buffer, unsigned count) override;
-		virtual int write(const uint8_t *buffer, unsigned count) override;
+#define fopen_s(fp, fmt, mode) *(fp) = fopen((fmt), (mode))
 
-		virtual uint64_t seek(uint64_t offset) override;
-		virtual uint64_t getSize() override;
+namespace Faux86 {
+class StdioDiskInterface : public DiskInterface {
+public:
+  StdioDiskInterface(const char *filename);
+  virtual ~StdioDiskInterface();
+  virtual int read(uint8_t *buffer, unsigned count) override;
+  virtual int write(const uint8_t *buffer, unsigned count) override;
 
-		virtual bool isValid() override { return diskFile != nullptr; }
+  virtual uint64_t seek(uint64_t offset) override;
+  virtual uint64_t getSize() override;
 
-	private:
-		FILE* diskFile;
-		uint64_t diskSize;
-	};
-}
+  virtual bool isValid() override { return diskFile != nullptr; }
+
+private:
+  FILE *diskFile;
+  uint64_t diskSize;
+};
+} // namespace Faux86
