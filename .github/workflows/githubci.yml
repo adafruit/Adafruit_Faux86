@@ -63,10 +63,12 @@ jobs:
     - name: pre-install
       run: bash ci/actions_install.sh
 
-    - name: Install faux86-remake manually
+    - name: Install faux86-remake and touch libraries manually
       run: |
         arduino-cli config set library.enable_unsafe_install true
         arduino-cli lib install --git-url https://github.com/moononournation/Faux86-remake.git
+        arduino-cli lib install --git-url https://github.com/mmMicky/TouchLib.git
+        arduino-cli lib install --git-url https://github.com/PaulStoffregen/XPT2046_Touchscreen.git
 
     - name: test platforms
       run: python3 ci/build_platform.py ${{ matrix.arduino-platform }}
